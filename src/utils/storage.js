@@ -49,6 +49,10 @@ export const CATEGORIES = [
   { id: 'break', label: 'Break', color: '#10b981', emoji: '☕' },
   { id: 'leisure', label: 'Leisure', color: '#f97316', emoji: '🎮' },
   { id: 'chores', label: 'Chores', color: '#a3e635', emoji: '🧹' },
+  { id: 'morning-ritual', label: 'Morning Ritual', color: '#fbbf24', emoji: '🌅' },
+  { id: 'night-ritual', label: 'Night Ritual', color: '#818cf8', emoji: '🌙' },
+  { id: 'startup-ritual', label: 'Startup Ritual', color: '#34d399', emoji: '🚀' },
+  { id: 'shutdown-ritual', label: 'Shutdown Ritual', color: '#fb923c', emoji: '🔒' },
   { id: 'other', label: 'Other', color: '#64748b', emoji: '📌' },
 ];
 
