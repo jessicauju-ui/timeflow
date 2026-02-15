@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useReducer } from 'react';
 import Header from './components/Header';
 import TimeLog from './components/TimeLog';
 import Analytics from './components/Analytics';
@@ -9,6 +9,7 @@ function App() {
   const [view, setView] = useState('log');
   const [selectedDate, setSelectedDate] = useState(getToday());
   const [entries, setEntries] = useState([]);
+  const [reloadKey, forceReload] = useReducer(x => x + 1, 0);
 
   // Load data for selected date
   useEffect(() => {
@@ -21,7 +22,7 @@ function App() {
 
     const fullEntries = slots.map(s => entryMap[s.id] || { slotId: s.id, activity: '', category: '' });
     setEntries(fullEntries);
-  }, [selectedDate]);
+  }, [selectedDate, reloadKey]);
 
   const handleSave = useCallback((slotId, { activity, category }) => {
     setEntries(prev => {
@@ -44,8 +45,9 @@ function App() {
         setView={setView}
         selectedDate={selectedDate}
         setSelectedDate={setSelectedDate}
+        onDataImported={forceReload}
       />
-      <main className="max-w-5xl mx-auto px-4 py-6">
+      <main className="max-w-5xl mx-auto px-3 sm:px-4 py-4 sm:py-6 pb-8">
         {view === 'log' ? (
           <TimeLog entries={entries} onSave={handleSave} />
         ) : (

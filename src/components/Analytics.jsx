@@ -13,13 +13,13 @@ function StatCard({ icon: Icon, label, value, sub, color = 'primary' }) {
   };
 
   return (
-    <div className={`bg-gradient-to-br ${colors[color]} border rounded-2xl p-4`}>
-      <div className="flex items-center gap-2 mb-2">
-        <Icon size={16} />
-        <span className="text-xs font-medium text-surface-400 uppercase tracking-wider">{label}</span>
+    <div className={`bg-gradient-to-br ${colors[color]} border rounded-2xl p-3`}>
+      <div className="flex items-center gap-1.5 mb-1.5">
+        <Icon size={14} />
+        <span className="text-[10px] font-medium text-surface-400 uppercase tracking-wider">{label}</span>
       </div>
-      <p className="text-2xl font-bold text-white">{value}</p>
-      {sub && <p className="text-xs text-surface-400 mt-1">{sub}</p>}
+      <p className="text-lg font-bold text-white">{value}</p>
+      {sub && <p className="text-[10px] text-surface-400 mt-1 truncate">{sub}</p>}
     </div>
   );
 }
@@ -72,12 +72,12 @@ function ProductivityHeatmap({ entries }) {
   };
 
   return (
-    <div className="bg-surface-900 border border-surface-800 rounded-2xl p-5">
+    <div className="bg-surface-900 border border-surface-800 rounded-2xl p-3 sm:p-5">
       <h3 className="text-sm font-semibold text-surface-300 uppercase tracking-wider mb-1">Daily Productivity Map</h3>
       <p className="text-xs text-surface-500 mb-4">Each block = 15 minutes of your day</p>
 
       {/* Legend */}
-      <div className="flex items-center gap-4 mb-4 text-xs">
+      <div className="flex flex-wrap items-center gap-3 sm:gap-4 mb-4 text-xs">
         <div className="flex items-center gap-1.5">
           <div className="w-3 h-3 rounded-sm bg-emerald-500" />
           <span className="text-surface-400">Productive</span>
@@ -99,9 +99,9 @@ function ProductivityHeatmap({ entries }) {
       {/* Heatmap grid */}
       <div className="space-y-1">
         {/* Column headers */}
-        <div className="flex items-center gap-1 mb-1">
-          <div className="w-14 shrink-0" />
-          <div className="flex-1 grid grid-cols-4 gap-1 text-center">
+        <div className="flex items-center gap-0.5 sm:gap-1 mb-1">
+          <div className="w-10 sm:w-14 shrink-0" />
+          <div className="flex-1 grid grid-cols-4 gap-0.5 sm:gap-1 text-center">
             <span className="text-[10px] text-surface-500">:00</span>
             <span className="text-[10px] text-surface-500">:15</span>
             <span className="text-[10px] text-surface-500">:30</span>
@@ -117,11 +117,11 @@ function ProductivityHeatmap({ entries }) {
           });
 
           return (
-            <div key={h} className="flex items-center gap-1">
-              <div className="w-14 shrink-0 text-right pr-2">
-                <span className="text-[11px] font-medium text-surface-500">{hourLabel}</span>
+            <div key={h} className="flex items-center gap-0.5 sm:gap-1">
+              <div className="w-10 sm:w-14 shrink-0 text-right pr-1 sm:pr-2">
+                <span className="text-[10px] sm:text-[11px] font-medium text-surface-500">{hourLabel}</span>
               </div>
-              <div className="flex-1 grid grid-cols-4 gap-1">
+              <div className="flex-1 grid grid-cols-4 gap-0.5 sm:gap-1">
                 {minuteSlots.map(({ slotId, entry }) => {
                   const cat = CATEGORIES.find(c => c.id === entry?.category);
                   return (
@@ -130,9 +130,11 @@ function ProductivityHeatmap({ entries }) {
                       className="relative"
                       onMouseEnter={() => setHoveredSlot(slotId)}
                       onMouseLeave={() => setHoveredSlot(null)}
+                      onTouchStart={() => setHoveredSlot(slotId)}
+                      onTouchEnd={() => setTimeout(() => setHoveredSlot(null), 1500)}
                     >
                       <div
-                        className={`h-7 rounded-md transition-all cursor-default ${getSlotColor(slotId)} ${getSlotOpacity(slotId)} ${
+                        className={`h-6 sm:h-7 rounded-md transition-all cursor-default ${getSlotColor(slotId)} ${getSlotOpacity(slotId)} ${
                           hoveredSlot === slotId ? 'ring-2 ring-white/30 scale-105' : ''
                         }`}
                       />
@@ -179,7 +181,7 @@ export default function Analytics({ entries }) {
   return (
     <div className="space-y-6">
       {/* Stat cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-4">
         <StatCard icon={Clock} label="Time Logged" value={`${stats.totalHours}h`} sub={`${stats.totalMinutes} minutes`} color="primary" />
         <StatCard icon={Brain} label="Productivity" value={`${stats.productivityScore}%`} sub={`${stats.productiveMinutes} min focused`} color="green" />
         <StatCard icon={Flame} label="Best Streak" value={`${stats.maxStreak}m`} sub="Uninterrupted focus" color="amber" />
@@ -214,10 +216,10 @@ export default function Analytics({ entries }) {
         {/* Hourly bar chart */}
         <div className="bg-surface-900 border border-surface-800 rounded-2xl p-4">
           <h3 className="text-sm font-semibold text-surface-300 uppercase tracking-wider mb-4">Hourly Breakdown</h3>
-          <ResponsiveContainer width="100%" height={220}>
+          <ResponsiveContainer width="100%" height={200}>
             <BarChart data={stats.hourlyData} barGap={0}>
-              <XAxis dataKey="hour" tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} width={30} />
+              <XAxis dataKey="hour" tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} width={25} />
               <Tooltip content={<CustomTooltip />} />
               <Bar dataKey="productive" name="Productive" stackId="a" fill="#6366f1" radius={[0, 0, 0, 0]} />
               <Bar dataKey="other" name="Other" stackId="a" fill="#334155" radius={[4, 4, 0, 0]} />
@@ -228,27 +230,29 @@ export default function Analytics({ entries }) {
         {/* Category pie chart */}
         <div className="bg-surface-900 border border-surface-800 rounded-2xl p-4">
           <h3 className="text-sm font-semibold text-surface-300 uppercase tracking-wider mb-4">Category Split</h3>
-          <div className="flex items-center gap-4">
-            <ResponsiveContainer width="50%" height={220}>
-              <PieChart>
-                <Pie
-                  data={stats.categoryBreakdown}
-                  dataKey="minutes"
-                  nameKey="label"
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={50}
-                  outerRadius={80}
-                  paddingAngle={3}
-                  strokeWidth={0}
-                >
-                  {stats.categoryBreakdown.map((c, i) => (
-                    <Cell key={i} fill={c.color} />
-                  ))}
-                </Pie>
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="flex-1 space-y-2">
+          <div className="flex flex-col items-center gap-4">
+            <div className="w-full" style={{ height: 180 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={stats.categoryBreakdown}
+                    dataKey="minutes"
+                    nameKey="label"
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={40}
+                    outerRadius={70}
+                    paddingAngle={3}
+                    strokeWidth={0}
+                  >
+                    {stats.categoryBreakdown.map((c, i) => (
+                      <Cell key={i} fill={c.color} />
+                    ))}
+                  </Pie>
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="w-full space-y-2">
               {stats.categoryBreakdown.map((c, i) => (
                 <div key={i} className="flex items-center gap-2">
                   <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: c.color }} />

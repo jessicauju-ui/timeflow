@@ -43,7 +43,7 @@ function SlotCell({ slot, entry, onSave, isCurrent }) {
 
   if (isEditing) {
     return (
-      <div className="col-span-4 bg-surface-800 border border-primary-500/40 rounded-xl p-3 space-y-2">
+      <div className="col-span-2 sm:col-span-4 bg-surface-800 border border-primary-500/40 rounded-xl p-3 space-y-2">
         <div className="flex items-center gap-2 mb-1">
           <span className="text-xs font-medium text-primary-400">{slot.label}</span>
         </div>
@@ -189,8 +189,8 @@ export default function TimeLog({ entries, onSave }) {
                 </span>
               </div>
 
-              {/* 4-column grid of 15-min slots */}
-              <div className="grid grid-cols-4 gap-2 p-2">
+              {/* 2-col on mobile, 4-col on desktop */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-2">
                 {hourSlots.map(slot => (
                   <SlotCell
                     key={slot.id}
