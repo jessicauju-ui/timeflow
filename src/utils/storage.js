@@ -53,6 +53,8 @@ export const CATEGORIES = [
   { id: 'night-ritual', label: 'Night Ritual', color: '#818cf8', emoji: '🌙' },
   { id: 'startup-ritual', label: 'Startup Ritual', color: '#34d399', emoji: '🚀' },
   { id: 'shutdown-ritual', label: 'Shutdown Ritual', color: '#fb923c', emoji: '🔒' },
+  { id: 'commute', label: 'Commute', color: '#38bdf8', emoji: '🚗' },
+  { id: 'social', label: 'Social', color: '#e879f9', emoji: '🤝' },
   { id: 'other', label: 'Other', color: '#64748b', emoji: '📌' },
 ];
 
