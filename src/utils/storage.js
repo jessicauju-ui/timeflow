@@ -48,6 +48,7 @@ export const CATEGORIES = [
   { id: 'exercise', label: 'Exercise', color: '#ef4444', emoji: '💪' },
   { id: 'break', label: 'Break', color: '#10b981', emoji: '☕' },
   { id: 'leisure', label: 'Leisure', color: '#f97316', emoji: '🎮' },
+  { id: 'chores', label: 'Chores', color: '#a3e635', emoji: '🧹' },
   { id: 'other', label: 'Other', color: '#64748b', emoji: '📌' },
 ];
 
