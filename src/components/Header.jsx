@@ -1,9 +1,9 @@
 import { useRef, useState } from 'react';
 import { Clock, BarChart3, ChevronLeft, ChevronRight, Download, Upload } from 'lucide-react';
-import { exportAllData, importData } from '../utils/storage';
+import { exportAllData, importData, getToday } from '../utils/storage';
 
 export default function Header({ view, setView, selectedDate, setSelectedDate, onDataImported }) {
-  const today = new Date().toISOString().split('T')[0];
+  const today = getToday();
   const isToday = selectedDate === today;
   const fileInputRef = useRef(null);
   const [importStatus, setImportStatus] = useState(null);
@@ -20,7 +20,10 @@ export default function Header({ view, setView, selectedDate, setSelectedDate, o
   const changeDate = (dir) => {
     const d = new Date(selectedDate + 'T12:00:00');
     d.setDate(d.getDate() + dir);
-    setSelectedDate(d.toISOString().split('T')[0]);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    setSelectedDate(`${y}-${m}-${day}`);
   };
 
   const handleImport = async (e) => {
