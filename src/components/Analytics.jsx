@@ -4,7 +4,7 @@ import { Brain, Flame, Clock, TrendingUp, Zap, Coffee, AlertTriangle, CheckCircl
 import { computeAnalytics, computePeriodAnalytics, PRODUCTIVE_IDS } from '../utils/analytics';
 import { generateTimeSlots, CATEGORIES, getWeekRange, getMonthRange, loadDateRange } from '../utils/storage';
 
-const UNPRODUCTIVE_IDS = ['leisure', 'other'];
+const UNPRODUCTIVE_IDS = ['leisure', 'other', 'social', 'chores', 'commute'];
 
 function StatCard({ icon: Icon, label, value, sub, color = 'primary' }) {
   const colors = {
