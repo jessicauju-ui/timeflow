@@ -1,5 +1,7 @@
 import { CATEGORIES } from './storage';
 
+export const PRODUCTIVE_IDS = ['deep-work', 'meeting', 'email', 'admin', 'learning', 'creative', 'exercise'];
+
 export function computeAnalytics(entries) {
   const totalSlots = entries.filter(e => e.activity).length;
   const totalMinutes = totalSlots * 15;
@@ -24,7 +26,7 @@ export function computeAnalytics(entries) {
     .sort((a, b) => b.minutes - a.minutes);
 
   // Productive categories (everything except leisure, other, and break)
-  const productiveIds = ['deep-work', 'meeting', 'email', 'admin', 'learning', 'creative', 'exercise'];
+  const productiveIds = PRODUCTIVE_IDS;
   const productiveMinutes = productiveIds.reduce((sum, id) => sum + (categoryMap[id] || 0), 0);
   const productivityScore = totalMinutes > 0 ? Math.round((productiveMinutes / totalMinutes) * 100) : 0;
 
@@ -109,4 +111,78 @@ export function computeAnalytics(entries) {
     insights,
     productiveMinutes,
   };
+}
+
+export function computePeriodAnalytics(dateEntriesMap) {
+  const allEntries = Object.values(dateEntriesMap).flat();
+  const aggregated = computeAnalytics(allEntries);
+
+  const dailySummaries = Object.entries(dateEntriesMap)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, entries]) => {
+      const filled = entries.filter(e => e.activity).length;
+      const productive = entries.filter(e => e.activity && PRODUCTIVE_IDS.includes(e.category)).length;
+      return {
+        date,
+        dayLabel: new Date(date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
+        dayNumber: new Date(date + 'T12:00:00').getDate(),
+        dayOfWeek: new Date(date + 'T12:00:00').getDay(),
+        totalSlots: filled,
+        totalMinutes: filled * 15,
+        productiveSlots: productive,
+        productiveMinutes: productive * 15,
+        productivityScore: filled > 0 ? Math.round((productive / filled) * 100) : 0,
+        entries,
+      };
+    });
+
+  const daysWithData = dailySummaries.filter(d => d.totalSlots > 0).length;
+  const avgMinutesPerDay = daysWithData > 0 ? Math.round(aggregated.totalMinutes / daysWithData) : 0;
+  const avgProductivityScore = daysWithData > 0
+    ? Math.round(dailySummaries.filter(d => d.totalSlots > 0).reduce((s, d) => s + d.productivityScore, 0) / daysWithData)
+    : 0;
+
+  const insights = generatePeriodInsights(aggregated, dailySummaries, daysWithData);
+
+  return {
+    ...aggregated,
+    dailySummaries,
+    daysWithData,
+    totalDays: dailySummaries.length,
+    avgMinutesPerDay,
+    avgProductivityScore,
+    insights,
+  };
+}
+
+function generatePeriodInsights(aggregated, dailySummaries, daysWithData) {
+  const insights = [];
+  const totalDays = dailySummaries.length;
+  if (daysWithData === 0) return insights;
+
+  if (daysWithData < totalDays) {
+    insights.push({ type: 'neutral', text: `You logged data on ${daysWithData} of ${totalDays} days in this period.` });
+  } else {
+    insights.push({ type: 'positive', text: `Perfect logging streak! You tracked all ${totalDays} days.` });
+  }
+
+  if (aggregated.productivityScore >= 70) {
+    insights.push({ type: 'positive', text: `Strong period! ${aggregated.productivityScore}% of your logged time was productive.` });
+  } else if (aggregated.productivityScore >= 50) {
+    insights.push({ type: 'positive', text: `Solid productivity at ${aggregated.productivityScore}% across the period.` });
+  } else if (aggregated.totalMinutes > 0) {
+    insights.push({ type: 'neutral', text: 'Consider blocking off more time for deep work.' });
+  }
+
+  const sorted = dailySummaries.filter(d => d.totalSlots > 0).sort((a, b) => b.productivityScore - a.productivityScore);
+  if (sorted.length >= 2) {
+    insights.push({ type: 'positive', text: `Most productive day: ${sorted[0].dayLabel} at ${sorted[0].productivityScore}%.` });
+  }
+
+  const meetingMinutes = aggregated.categoryBreakdown.find(c => c.id === 'meeting')?.minutes || 0;
+  if (meetingMinutes > 300) {
+    insights.push({ type: 'warning', text: `${(meetingMinutes / 60).toFixed(1)} hours in meetings this period. Consider protecting more focus blocks.` });
+  }
+
+  return insights;
 }

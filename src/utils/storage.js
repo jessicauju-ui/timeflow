@@ -86,6 +86,53 @@ export function exportAllData() {
   URL.revokeObjectURL(url);
 }
 
+function formatDateObj(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+export function getWeekRange(dateStr) {
+  const d = new Date(dateStr + 'T12:00:00');
+  const day = d.getDay(); // 0=Sun, 1=Mon...
+  const diffToMon = day === 0 ? -6 : 1 - day;
+  const mon = new Date(d);
+  mon.setDate(d.getDate() + diffToMon);
+  const sun = new Date(mon);
+  sun.setDate(mon.getDate() + 6);
+  return { start: formatDateObj(mon), end: formatDateObj(sun) };
+}
+
+export function getMonthRange(dateStr) {
+  const d = new Date(dateStr + 'T12:00:00');
+  const start = new Date(d.getFullYear(), d.getMonth(), 1);
+  const end = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+  return { start: formatDateObj(start), end: formatDateObj(end) };
+}
+
+export function getDatesBetween(startStr, endStr) {
+  const dates = [];
+  const cur = new Date(startStr + 'T12:00:00');
+  const end = new Date(endStr + 'T12:00:00');
+  while (cur <= end) {
+    dates.push(formatDateObj(cur));
+    cur.setDate(cur.getDate() + 1);
+  }
+  return dates;
+}
+
+export function loadDateRange(startStr, endStr) {
+  const all = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+  const dates = getDatesBetween(startStr, endStr);
+  const result = {};
+  dates.forEach(d => {
+    const dayData = all[d];
+    result[d] = dayData?.entries || [];
+  });
+  return result;
+}
+
 export function importData(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();

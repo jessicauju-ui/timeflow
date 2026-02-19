@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { Brain, Flame, Clock, TrendingUp, Zap, Coffee, AlertTriangle, CheckCircle, BarChart3 } from 'lucide-react';
-import { computeAnalytics } from '../utils/analytics';
-import { generateTimeSlots, CATEGORIES } from '../utils/storage';
+import { Brain, Flame, Clock, TrendingUp, Zap, Coffee, AlertTriangle, CheckCircle, BarChart3, Calendar } from 'lucide-react';
+import { computeAnalytics, computePeriodAnalytics, PRODUCTIVE_IDS } from '../utils/analytics';
+import { generateTimeSlots, CATEGORIES, getWeekRange, getMonthRange, loadDateRange } from '../utils/storage';
+
+const UNPRODUCTIVE_IDS = ['leisure', 'other'];
 
 function StatCard({ icon: Icon, label, value, sub, color = 'primary' }) {
   const colors = {
@@ -38,31 +40,22 @@ const CustomTooltip = ({ active, payload, label }) => {
   );
 };
 
-const PRODUCTIVE_IDS = ['deep-work', 'meeting', 'email', 'admin', 'learning', 'creative', 'exercise'];
-const UNPRODUCTIVE_IDS = ['leisure', 'other'];
+// ─── Daily Productivity Heatmap (unchanged) ───
 
 function ProductivityHeatmap({ entries }) {
   const [hoveredSlot, setHoveredSlot] = useState(null);
-  const slots = generateTimeSlots();
   const entryMap = {};
   entries.forEach(e => { entryMap[e.slotId] = e; });
 
-  // Group by hour for the grid rows
   const hours = [];
-  for (let h = 6; h <= 23; h++) {
-    hours.push(h);
-  }
+  for (let h = 6; h <= 23; h++) hours.push(h);
 
   const getSlotColor = (slotId) => {
     const entry = entryMap[slotId];
-    if (!entry?.activity) return 'bg-surface-800/60'; // empty - dark gray
-    if (entry.category === 'break') {
-      return 'bg-amber-500/70'; // break - amber
-    }
-    if (UNPRODUCTIVE_IDS.includes(entry.category)) {
-      return 'bg-red-400/70'; // unproductive - red
-    }
-    return 'bg-emerald-500'; // productive - green
+    if (!entry?.activity) return 'bg-surface-800/60';
+    if (entry.category === 'break') return 'bg-amber-500/70';
+    if (UNPRODUCTIVE_IDS.includes(entry.category)) return 'bg-red-400/70';
+    return 'bg-emerald-500';
   };
 
   const getSlotOpacity = (slotId) => {
@@ -76,7 +69,6 @@ function ProductivityHeatmap({ entries }) {
       <h3 className="text-sm font-semibold text-surface-300 uppercase tracking-wider mb-1">Daily Productivity Map</h3>
       <p className="text-xs text-surface-500 mb-4">Each block = 15 minutes of your day</p>
 
-      {/* Legend */}
       <div className="flex flex-wrap items-center gap-3 sm:gap-4 mb-4 text-xs">
         <div className="flex items-center gap-1.5">
           <div className="w-3 h-3 rounded-sm bg-emerald-500" />
@@ -96,9 +88,7 @@ function ProductivityHeatmap({ entries }) {
         </div>
       </div>
 
-      {/* Heatmap grid */}
       <div className="space-y-1">
-        {/* Column headers */}
         <div className="flex items-center gap-0.5 sm:gap-1 mb-1">
           <div className="w-10 sm:w-14 shrink-0" />
           <div className="flex-1 grid grid-cols-4 gap-0.5 sm:gap-1 text-center">
@@ -138,7 +128,6 @@ function ProductivityHeatmap({ entries }) {
                           hoveredSlot === slotId ? 'ring-2 ring-white/30 scale-105' : ''
                         }`}
                       />
-                      {/* Tooltip */}
                       {hoveredSlot === slotId && entry?.activity && (
                         <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 pointer-events-none">
                           <div className="bg-surface-800 border border-surface-600 rounded-lg px-3 py-2 shadow-2xl whitespace-nowrap">
@@ -161,35 +150,361 @@ function ProductivityHeatmap({ entries }) {
   );
 }
 
-export default function Analytics({ entries }) {
-  const stats = computeAnalytics(entries);
+// ─── Weekly Heatmap (days × hours) ───
+
+function WeeklyHeatmap({ dailySummaries }) {
+  const [hoveredCell, setHoveredCell] = useState(null);
+  const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const hours = [];
+  for (let h = 6; h <= 23; h++) hours.push(h);
+
+  // Reorder summaries Mon(1)..Sun(0)
+  const orderedDays = [1, 2, 3, 4, 5, 6, 0].map(dow =>
+    dailySummaries.find(d => d.dayOfWeek === dow)
+  );
+
+  const getHourData = (daySummary, hour) => {
+    if (!daySummary?.entries) return { productive: 0, other: 0, total: 0 };
+    const hourEntries = daySummary.entries.filter(e => {
+      if (!e.activity) return false;
+      return parseInt(e.slotId.split(':')[0]) === hour;
+    });
+    const productive = hourEntries.filter(e => PRODUCTIVE_IDS.includes(e.category)).length;
+    const other = hourEntries.length - productive;
+    return { productive, other, total: hourEntries.length };
+  };
+
+  const getCellColor = (data) => {
+    if (data.total === 0) return 'bg-surface-800/60 opacity-40';
+    if (data.productive >= data.other) {
+      const intensity = Math.min(data.total / 4, 1);
+      if (intensity > 0.75) return 'bg-emerald-500';
+      if (intensity > 0.5) return 'bg-emerald-500/80';
+      if (intensity > 0.25) return 'bg-emerald-500/60';
+      return 'bg-emerald-500/40';
+    }
+    return 'bg-red-400/70';
+  };
+
+  return (
+    <div className="bg-surface-900 border border-surface-800 rounded-2xl p-3 sm:p-5">
+      <h3 className="text-sm font-semibold text-surface-300 uppercase tracking-wider mb-1">Weekly Activity Grid</h3>
+      <p className="text-xs text-surface-500 mb-4">Each block = 1 hour of your week</p>
+
+      <div className="flex flex-wrap items-center gap-3 sm:gap-4 mb-4 text-xs">
+        <div className="flex items-center gap-1.5">
+          <div className="w-3 h-3 rounded-sm bg-emerald-500" />
+          <span className="text-surface-400">Productive</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="w-3 h-3 rounded-sm bg-red-400/70" />
+          <span className="text-surface-400">Not productive</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="w-3 h-3 rounded-sm bg-surface-800/60 opacity-40" />
+          <span className="text-surface-400">No entry</span>
+        </div>
+      </div>
+
+      <div className="space-y-1 overflow-x-auto">
+        {/* Hour headers */}
+        <div className="flex items-center gap-0.5 mb-1" style={{ minWidth: '500px' }}>
+          <div className="w-10 shrink-0" />
+          <div className="flex-1 grid gap-0.5" style={{ gridTemplateColumns: `repeat(18, minmax(0, 1fr))` }}>
+            {hours.map(h => (
+              <span key={h} className="text-[8px] sm:text-[10px] text-surface-500 text-center">
+                {h % 12 || 12}{h < 12 ? 'a' : 'p'}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        {orderedDays.map((daySummary, dayIdx) => (
+          <div key={dayIdx} className="flex items-center gap-0.5" style={{ minWidth: '500px' }}>
+            <div className="w-10 shrink-0 text-right pr-1">
+              <span className="text-[10px] font-medium text-surface-500">{dayNames[dayIdx]}</span>
+            </div>
+            <div className="flex-1 grid gap-0.5" style={{ gridTemplateColumns: `repeat(18, minmax(0, 1fr))` }}>
+              {hours.map(h => {
+                const data = getHourData(daySummary, h);
+                const cellKey = `${dayIdx}-${h}`;
+                return (
+                  <div
+                    key={h}
+                    className="relative"
+                    onMouseEnter={() => setHoveredCell(cellKey)}
+                    onMouseLeave={() => setHoveredCell(null)}
+                  >
+                    <div className={`h-5 sm:h-6 rounded-sm transition-all cursor-default ${getCellColor(data)} ${
+                      hoveredCell === cellKey ? 'ring-2 ring-white/30 scale-110' : ''
+                    }`} />
+                    {hoveredCell === cellKey && data.total > 0 && (
+                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 pointer-events-none">
+                        <div className="bg-surface-800 border border-surface-600 rounded-lg px-3 py-2 shadow-2xl whitespace-nowrap">
+                          <p className="text-xs font-medium text-white">{dayNames[dayIdx]} {h % 12 || 12}:00 {h < 12 ? 'AM' : 'PM'}</p>
+                          <p className="text-[10px] text-emerald-400">{data.productive * 15} min productive</p>
+                          {data.other > 0 && <p className="text-[10px] text-surface-400">{data.other * 15} min other</p>}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Monthly Calendar Heatmap ───
+
+function MonthlyHeatmap({ dailySummaries, selectedDate }) {
+  const [hoveredDay, setHoveredDay] = useState(null);
+  const d = new Date(selectedDate + 'T12:00:00');
+  const year = d.getFullYear();
+  const month = d.getMonth();
+
+  const firstDayOfMonth = new Date(year, month, 1);
+  const startDow = (firstDayOfMonth.getDay() + 6) % 7; // Mon=0
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+  const summaryMap = {};
+  dailySummaries.forEach(s => { summaryMap[s.dayNumber] = s; });
+
+  const getScoreColor = (score, hasData) => {
+    if (!hasData) return 'bg-surface-800/40';
+    if (score >= 70) return 'bg-emerald-500/70';
+    if (score >= 50) return 'bg-yellow-400/60';
+    if (score >= 30) return 'bg-amber-500/60';
+    return 'bg-red-500/60';
+  };
+
+  const weeks = [];
+  let currentWeek = new Array(startDow).fill(null);
+  for (let day = 1; day <= daysInMonth; day++) {
+    currentWeek.push(day);
+    if (currentWeek.length === 7) {
+      weeks.push(currentWeek);
+      currentWeek = [];
+    }
+  }
+  if (currentWeek.length > 0) {
+    while (currentWeek.length < 7) currentWeek.push(null);
+    weeks.push(currentWeek);
+  }
+
+  const colHeaders = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+  return (
+    <div className="bg-surface-900 border border-surface-800 rounded-2xl p-3 sm:p-5">
+      <h3 className="text-sm font-semibold text-surface-300 uppercase tracking-wider mb-1">Monthly Overview</h3>
+      <p className="text-xs text-surface-500 mb-4">Color = daily productivity score</p>
+
+      <div className="flex flex-wrap items-center gap-3 sm:gap-4 mb-4 text-xs">
+        <div className="flex items-center gap-1.5">
+          <div className="w-3 h-3 rounded-sm bg-emerald-500/70" />
+          <span className="text-surface-400">&ge;70%</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="w-3 h-3 rounded-sm bg-yellow-400/60" />
+          <span className="text-surface-400">50-69%</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="w-3 h-3 rounded-sm bg-amber-500/60" />
+          <span className="text-surface-400">30-49%</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="w-3 h-3 rounded-sm bg-red-500/60" />
+          <span className="text-surface-400">&lt;30%</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="w-3 h-3 rounded-sm bg-surface-800/40" />
+          <span className="text-surface-400">No data</span>
+        </div>
+      </div>
+
+      <div className="space-y-1">
+        <div className="grid grid-cols-7 gap-1 mb-1">
+          {colHeaders.map(d => (
+            <span key={d} className="text-[10px] text-surface-500 text-center">{d}</span>
+          ))}
+        </div>
+
+        {weeks.map((week, wi) => (
+          <div key={wi} className="grid grid-cols-7 gap-1">
+            {week.map((day, di) => {
+              if (day === null) {
+                return <div key={di} className="h-10 sm:h-12" />;
+              }
+              const summary = summaryMap[day];
+              const hasData = summary && summary.totalSlots > 0;
+              const score = hasData ? summary.productivityScore : 0;
+              const cellKey = `day-${day}`;
+
+              return (
+                <div
+                  key={di}
+                  className="relative"
+                  onMouseEnter={() => setHoveredDay(cellKey)}
+                  onMouseLeave={() => setHoveredDay(null)}
+                >
+                  <div className={`h-10 sm:h-12 rounded-lg flex items-center justify-center transition-all cursor-default ${getScoreColor(score, hasData)} ${
+                    hoveredDay === cellKey ? 'ring-2 ring-white/30 scale-105' : ''
+                  }`}>
+                    <span className="text-xs font-medium text-white/80">{day}</span>
+                  </div>
+                  {hoveredDay === cellKey && hasData && (
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 pointer-events-none">
+                      <div className="bg-surface-800 border border-surface-600 rounded-lg px-3 py-2 shadow-2xl whitespace-nowrap">
+                        <p className="text-xs font-medium text-white">{summary.dayLabel}</p>
+                        <p className="text-[10px] text-surface-400">{(summary.totalMinutes / 60).toFixed(1)}h logged</p>
+                        <p className="text-[10px] text-emerald-400">{score}% productive</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Period Toggle ───
+
+function PeriodToggle({ periodMode, setPeriodMode }) {
+  return (
+    <div className="flex items-center gap-3">
+      <Calendar size={14} className="text-surface-400" />
+      <div className="flex items-center bg-surface-900 border border-surface-800 rounded-xl p-1">
+        {['daily', 'weekly', 'monthly'].map(mode => (
+          <button
+            key={mode}
+            onClick={() => setPeriodMode(mode)}
+            className={`px-3 sm:px-4 py-1.5 rounded-lg text-xs font-medium transition-all capitalize ${
+              periodMode === mode
+                ? 'bg-primary-600/20 text-primary-400 shadow-sm'
+                : 'text-surface-400 hover:text-white'
+            }`}
+          >
+            {mode}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Main Analytics Component ───
+
+export default function Analytics({ entries, selectedDate }) {
+  const [periodMode, setPeriodMode] = useState('daily');
+
+  const { stats, periodLabel, isMultiDay } = useMemo(() => {
+    if (periodMode === 'daily') {
+      const s = computeAnalytics(entries);
+      const d = new Date(selectedDate + 'T12:00:00');
+      const label = d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+      return { stats: s, periodLabel: label, isMultiDay: false };
+    }
+
+    const range = periodMode === 'weekly'
+      ? getWeekRange(selectedDate)
+      : getMonthRange(selectedDate);
+
+    const dateEntriesMap = loadDateRange(range.start, range.end);
+    const s = computePeriodAnalytics(dateEntriesMap);
+
+    let label;
+    if (periodMode === 'weekly') {
+      const startD = new Date(range.start + 'T12:00:00');
+      const endD = new Date(range.end + 'T12:00:00');
+      const opts = { month: 'short', day: 'numeric' };
+      label = `${startD.toLocaleDateString('en-US', opts)} – ${endD.toLocaleDateString('en-US', { ...opts, year: 'numeric' })}`;
+    } else {
+      const d = new Date(selectedDate + 'T12:00:00');
+      label = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    }
+
+    return { stats: s, periodLabel: label, isMultiDay: true };
+  }, [periodMode, entries, selectedDate]);
+
+  const hourlyChartData = useMemo(() => {
+    if (!isMultiDay || !stats.daysWithData) return stats.hourlyData;
+    return stats.hourlyData.map(h => ({
+      ...h,
+      productive: Math.round(h.productive / stats.daysWithData),
+      other: Math.round(h.other / stats.daysWithData),
+    }));
+  }, [stats, isMultiDay]);
 
   if (stats.totalSlots === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 text-center">
-        <div className="w-16 h-16 rounded-2xl bg-surface-800 flex items-center justify-center mb-4">
-          <BarChart3 size={28} className="text-surface-500" />
+      <div className="space-y-6">
+        <PeriodToggle periodMode={periodMode} setPeriodMode={setPeriodMode} />
+        <div className="flex flex-col items-center justify-center py-20 text-center">
+          <div className="w-16 h-16 rounded-2xl bg-surface-800 flex items-center justify-center mb-4">
+            <BarChart3 size={28} className="text-surface-500" />
+          </div>
+          <h3 className="text-lg font-semibold text-surface-300 mb-2">No data yet</h3>
+          <p className="text-sm text-surface-500 max-w-xs">
+            {isMultiDay
+              ? `No activities logged for this ${periodMode === 'weekly' ? 'week' : 'month'}.`
+              : 'Start logging your activities in the Log tab and your analytics will appear here.'}
+          </p>
         </div>
-        <h3 className="text-lg font-semibold text-surface-300 mb-2">No data yet</h3>
-        <p className="text-sm text-surface-500 max-w-xs">
-          Start logging your activities in the Log tab and your analytics will appear here.
-        </p>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      {/* Stat cards */}
-      <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-4">
-        <StatCard icon={Clock} label="Time Logged" value={`${stats.totalHours}h`} sub={`${stats.totalMinutes} minutes`} color="primary" />
-        <StatCard icon={Brain} label="Productivity" value={`${stats.productivityScore}%`} sub={`${stats.productiveMinutes} min focused`} color="green" />
-        <StatCard icon={Flame} label="Best Streak" value={`${stats.maxStreak}m`} sub="Uninterrupted focus" color="amber" />
-        <StatCard icon={Zap} label="Peak Hour" value={stats.peakHourLabel} sub="Most active" color="pink" />
+      {/* Period toggle + label */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+        <PeriodToggle periodMode={periodMode} setPeriodMode={setPeriodMode} />
+        <p className="text-xs text-surface-400">{periodLabel}</p>
       </div>
 
-      {/* Productivity Heatmap */}
-      <ProductivityHeatmap entries={entries} />
+      {/* Stat cards */}
+      <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-4">
+        <StatCard
+          icon={Clock}
+          label="Time Logged"
+          value={`${stats.totalHours}h`}
+          sub={isMultiDay ? `avg ${(stats.avgMinutesPerDay / 60).toFixed(1)}h/day` : `${stats.totalMinutes} minutes`}
+          color="primary"
+        />
+        <StatCard
+          icon={Brain}
+          label="Productivity"
+          value={`${isMultiDay ? stats.avgProductivityScore : stats.productivityScore}%`}
+          sub={isMultiDay ? `across ${stats.daysWithData} day${stats.daysWithData !== 1 ? 's' : ''}` : `${stats.productiveMinutes} min focused`}
+          color="green"
+        />
+        <StatCard
+          icon={Flame}
+          label="Best Streak"
+          value={`${stats.maxStreak}m`}
+          sub={isMultiDay ? 'Best single-day streak' : 'Uninterrupted focus'}
+          color="amber"
+        />
+        <StatCard
+          icon={Zap}
+          label="Peak Hour"
+          value={stats.peakHourLabel}
+          sub="Most active"
+          color="pink"
+        />
+      </div>
+
+      {/* Heatmap */}
+      {periodMode === 'daily' && <ProductivityHeatmap entries={entries} />}
+      {periodMode === 'weekly' && <WeeklyHeatmap dailySummaries={stats.dailySummaries} />}
+      {periodMode === 'monthly' && <MonthlyHeatmap dailySummaries={stats.dailySummaries} selectedDate={selectedDate} />}
 
       {/* Insights */}
       {stats.insights.length > 0 && (
@@ -215,9 +530,11 @@ export default function Analytics({ entries }) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Hourly bar chart */}
         <div className="bg-surface-900 border border-surface-800 rounded-2xl p-4">
-          <h3 className="text-sm font-semibold text-surface-300 uppercase tracking-wider mb-4">Hourly Breakdown</h3>
+          <h3 className="text-sm font-semibold text-surface-300 uppercase tracking-wider mb-4">
+            {isMultiDay ? 'Avg Hourly Breakdown' : 'Hourly Breakdown'}
+          </h3>
           <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={stats.hourlyData} barGap={0}>
+            <BarChart data={hourlyChartData} barGap={0}>
               <XAxis dataKey="hour" tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} width={25} />
               <Tooltip content={<CustomTooltip />} />

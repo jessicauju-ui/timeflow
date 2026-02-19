@@ -51,7 +51,7 @@ function App() {
         {view === 'log' ? (
           <TimeLog entries={entries} onSave={handleSave} />
         ) : (
-          <Analytics entries={entries} />
+          <Analytics entries={entries} selectedDate={selectedDate} />
         )}
       </main>
     </div>
